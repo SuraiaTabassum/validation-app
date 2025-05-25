@@ -1,4 +1,3 @@
-
 from flask import Flask, request, redirect
 import psycopg2
 
@@ -13,67 +12,62 @@ conn = psycopg2.connect(
     password="zIZIoLGRzsPYY5P4EKRHKmowP3gsDkXh"
 )
 
-# Home route shows Register link
-@app.route('/')
-def home():
-    return '''
-        <h2>Welcome!</h2>
-        <a href="/register">Register</a><br>
-        <a href="/login">Login</a>
-    '''
-
-# Registration form
-@app.route('/register', methods=['GET'])
-def show_register():
-    return '''
-        <h2>Register</h2>
-        <form method="post" action="/register">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Register">
-        </form>
-    '''
-
-# Handle registration data
-@app.route('/register', methods=['POST'])
-def register():
-    username = request.form['username']
-    password = request.form['password']
-
-    cur = conn.cursor()
-    cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+# Create 'users' table if it doesn't exist
+with conn.cursor() as cur:
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100),
+            password VARCHAR(100)
+        );
+    """)
     conn.commit()
-    cur.close()
 
-    return redirect('/login')
-
-# Login form
-@app.route('/login', methods=['GET'])
-def show_login():
+@app.route('/')
+def index():
     return '''
         <h2>Login</h2>
         <form method="post" action="/login">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Login">
+            Username: <input type="text" name="username" /><br>
+            Password: <input type="password" name="password" /><br>
+            <input type="submit" value="Login" />
         </form>
+        <p>Don't have an account? <a href="/register">Register here</a></p>
     '''
 
-# Handle login
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form['username']
     password = request.form['password']
-
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
-    user = cur.fetchone()
-    cur.close()
+    
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+        user = cur.fetchone()
 
     if user:
         return f"<h3>Welcome, {username}!</h3>"
     else:
         return "<h3>Invalid username or password</h3>"
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+            conn.commit()
+
+        return redirect('/')  # Redirect to login after registration
+    return '''
+        <h2>Register</h2>
+        <form method="post">
+            Username: <input type="text" name="username" /><br>
+            Password: <input type="password" name="password" /><br>
+            <input type="submit" value="Register" />
+        </form>
+    '''
 
 if __name__ == '__main__':
     app.run(debug=True)
